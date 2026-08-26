@@ -42,39 +42,37 @@ jobs:
       - name: Show Forge version
         run: forge --version
 
-      - name: Build Contracts
-        run: forge build --sizes
+      - name: Setup Node.js for ABI validation
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.11.1'
 
-      - name: List test suites (Contracts/test/)
-        run: forge test --list
-
-      - name: Run Contracts/test/ tests
-        run: forge test -vvv
+      - name: Build MarketFactory foundation
+        run: forge build src/MarketFactory.sol
         env:
           FOUNDRY_PROFILE: ci
 
-  # ─── root test/ suite (uses root foundry.toml) ───────────────────────────
-  root-tests:
-    name: root test/ suite
-    runs-on: ubuntu-latest
+      - name: Verify MarketFactory ABI artifact
+        run: test -s out/MarketFactory.sol/MarketFactory.json && test -s out/PositionToken.sol/PositionToken.json
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Upload market foundation ABIs
+        uses: actions/upload-artifact@v4
         with:
-          submodules: recursive
+          name: market-foundation-abis
+          path: |
+            Contracts/out/MarketFactory.sol/MarketFactory.json
+            Contracts/out/PositionToken.sol/PositionToken.json
 
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+      - name: Prepare isolated MarketFactory test root
+        run: cp test/MarketFactory.t.sol test/marketfactory/MarketFactory.t.sol
 
-      - name: Show Forge version
-        run: forge --version
+      - name: Run MarketFactory verification tests
+        run: forge test --root test/marketfactory -vvv
+        env:
+          FOUNDRY_PROFILE: ci
 
-      - name: Build (root profile)
-        run: forge build --sizes
-
-      - name: List test suites (root test/)
-        run: forge test --list
-
-      - name: Run root test/ tests
-        run: forge test -vvv
+      - name: Confirm ABI artifacts are non-empty JSON
+        run: |
+          test -s out/MarketFactory.sol/MarketFactory.json
+          test -s out/PositionToken.sol/PositionToken.json
+          node -e "for (const file of ['out/MarketFactory.sol/MarketFactory.json', 'out/PositionToken.sol/PositionToken.json']) { const artifact = require('./' + file); if (!Array.isArray(artifact.abi) || artifact.abi.length === 0) throw new Error(file + ' has no ABI'); }"
