@@ -42,8 +42,13 @@ jobs:
       - name: Show Forge version
         run: forge --version
 
+      - name: Setup Node.js for ABI validation
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.11.1'
+
       - name: Build MarketFactory foundation
-        run: forge build --sizes src/MarketFactory.sol
+        run: forge build src/MarketFactory.sol
         env:
           FOUNDRY_PROFILE: ci
 
@@ -65,3 +70,9 @@ jobs:
         run: forge test --root test/marketfactory -vvv
         env:
           FOUNDRY_PROFILE: ci
+
+      - name: Confirm ABI artifacts are non-empty JSON
+        run: |
+          test -s out/MarketFactory.sol/MarketFactory.json
+          test -s out/PositionToken.sol/PositionToken.json
+          node -e "for (const file of ['out/MarketFactory.sol/MarketFactory.json', 'out/PositionToken.sol/PositionToken.json']) { const artifact = require('./' + file); if (!Array.isArray(artifact.abi) || artifact.abi.length === 0) throw new Error(file + ' has no ABI'); }"

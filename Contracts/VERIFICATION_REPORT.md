@@ -15,11 +15,11 @@ This report verifies the Phase 2 market-foundation wiring described by issue #79
 | --- | --- |
 | MarketFactory | `Contracts/src/MarketFactory.sol` |
 | PositionToken | `Contracts/src/PositionToken.sol` |
-| MarketFactory tests | `Contracts/test/MarketFactory.t.sol` |
+| MarketFactory tests | `Contracts/test/MarketFactory.t.sol` (copied to `Contracts/test/marketfactory/MarketFactory.t.sol` in CI) |
 | Foundry configuration | `Contracts/foundry.toml` |
 | CI workflow | `.github/workflows/forge-tests.yml` |
 
-The `Contracts/` Foundry profile retains `contracts/` as its legacy source root. MarketFactory verification is explicitly scoped to `src/MarketFactory.sol` and `test/MarketFactory.t.sol`, which compile the `src/` foundation without pulling unrelated legacy contracts into this phase-gated check.
+The `Contracts/` Foundry profile retains `contracts/` as its legacy source root. MarketFactory verification is explicitly scoped to `src/MarketFactory.sol` and the canonical `test/MarketFactory.t.sol`; CI copies that test into the existing `test/marketfactory/` isolated root, whose profile resolves `market-foundation/` to `Contracts/src/` without pulling unrelated legacy contracts into this phase-gated check.
 
 ## MarketFactory wiring
 
@@ -61,7 +61,7 @@ The public registry queries are:
 
 ## ABI artifacts and application consumers
 
-Running `forge build` from `Contracts/` generates the ABI artifact at:
+Running the scoped `forge build src/MarketFactory.sol` from `Contracts/` generates the ABI artifact at:
 
 ```text
 Contracts/out/MarketFactory.sol/MarketFactory.json
@@ -77,19 +77,19 @@ Run from the repository root:
 
 ```bash
 cd Contracts
-forge build --sizes src/MarketFactory.sol
+forge build src/MarketFactory.sol
 cp test/MarketFactory.t.sol test/marketfactory/MarketFactory.t.sol
 FOUNDRY_PROFILE=ci forge test --root test/marketfactory -vvv
 ```
 
-The same scoped commands are executed by `.github/workflows/forge-tests.yml` for the `Contracts/` suite. The workflow copies the canonical `test/MarketFactory.t.sol` into the isolated Foundry project rooted at `test/marketfactory/` before testing. Its `market-foundation/` remapping resolves the source-of-truth contracts without compiling unrelated legacy sources, while keeping the repository’s test logic defined in one place. The CI profile uses 512 fuzz runs.
+The same scoped commands are executed by `.github/workflows/forge-tests.yml`. From `Contracts/`, the workflow builds `src/MarketFactory.sol`, asserts both ABI files are non-empty JSON, copies the canonical `test/MarketFactory.t.sol` into the existing isolated Foundry project rooted at `test/marketfactory/`, and runs `FOUNDRY_PROFILE=ci forge test --root test/marketfactory -vvv`. Its `market-foundation/` remapping resolves the source-of-truth contracts without compiling unrelated legacy sources, while keeping the repository’s test logic defined in one place. The CI profile uses 512 fuzz runs.
 
-## Compiler warnings
+## Compiler output
 
-No critical compiler warnings are accepted for this report. The scoped MarketFactory build and test commands must compile without errors; unrelated legacy source files are intentionally excluded from this phase-gated check.
+The phase gate requires the scoped MarketFactory build to complete without compiler errors. The current CI action may report a non-blocking Forge nightly warning and a mutability warning in the test fixture; both remain visible in workflow output. Unrelated legacy source files are intentionally excluded from this phase-gated check.
 
 ## Verification result
 
-**Result: ✅ PASS when the commands above complete successfully.**
+**Result: CI-gated; PASS only when the scoped build, ABI assertions, and Foundry tests above complete successfully.**
 
 This report is intentionally tied to executable source and test paths rather than a manual claim that Forge is unavailable. The prior report described RevokeFunction and did not verify the MarketFactory foundation; it has been superseded by this document.
